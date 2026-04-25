@@ -1,7 +1,13 @@
 import axios from "axios";
 
+// In development, Vite proxies /api → localhost:8000.
+// In production, set VITE_API_BASE_URL to the Railway backend URL.
+const baseURL = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api/v1`
+  : "/api/v1";
+
 const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -22,7 +28,7 @@ api.interceptors.response.use(
       const refresh = localStorage.getItem("refresh_token");
       if (refresh) {
         try {
-          const { data } = await axios.post("/api/v1/auth/token/refresh/", {
+          const { data } = await axios.post(`${baseURL}/auth/token/refresh/`, {
             refresh,
           });
           localStorage.setItem("access_token", data.access);

@@ -1,12 +1,16 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-key-change-in-production")
 DEBUG = os.environ.get("DEBUG", "True") == "True"
+
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+# Also allow Railway/Render auto-generated hostnames
+ALLOWED_HOSTS += ["*.railway.app", "*.onrender.com", "*.up.railway.app"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -27,6 +31,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -55,16 +60,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.sqlite3"),
-        "NAME": os.environ.get("DB_NAME", str(BASE_DIR / "db.sqlite3")),
-        "USER": os.environ.get("DB_USER", ""),
-        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-        "HOST": os.environ.get("DB_HOST", ""),
-        "PORT": os.environ.get("DB_PORT", ""),
+# Database — prefers DATABASE_URL env var (Railway/Render inject this automatically)
+_db_url = os.environ.get("DATABASE_URL")
+if _db_url:
+    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.sqlite3"),
+            "NAME": os.environ.get("DB_NAME", str(BASE_DIR / "db.sqlite3")),
+            "USER": os.environ.get("DB_USER", ""),
+            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+            "HOST": os.environ.get("DB_HOST", ""),
+            "PORT": os.environ.get("DB_PORT", ""),
+        }
     }
-}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -79,15 +89,18 @@ USE_I18N = True
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Static & media files
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
 MEDIA_URL_BASE = os.environ.get("MEDIA_URL_BASE", "http://localhost:8000/media/")
 
-# CORS
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:5173"
-).split(",")
+# CORS — accept origins from env (comma-separated)
+_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
 CORS_ALLOW_CREDENTIALS = True
 
 # DRF
